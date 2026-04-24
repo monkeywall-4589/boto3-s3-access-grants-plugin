@@ -109,3 +109,57 @@ class TestS3AccessGrantsPlugin(unittest.TestCase):
         s3_client = self._create_mock_s3_client()
         plugin = S3AccessGrantsPlugin(s3_client)
         self.assertFalse(plugin.fallback_enabled)
+
+    def test_initializing_plugin_with_audit_context(self):
+        s3_client = self._create_mock_s3_client()
+        plugin = S3AccessGrantsPlugin(s3_client, audit_context="test-audit-context")
+        self.assertEqual(plugin.audit_context, "test-audit-context")
+
+    def test_initializing_plugin_without_audit_context_defaults_to_none(self):
+        s3_client = self._create_mock_s3_client()
+        plugin = S3AccessGrantsPlugin(s3_client)
+        self.assertIsNone(plugin.audit_context)
+
+    @patch('aws_s3_access_grants_boto3_plugin.s3_access_grants_plugin.AccessGrantsCache.get_credentials')
+    def test_get_value_from_cache_passes_audit_context(self, get_credentials_mock):
+        s3_client = self._create_mock_s3_client()
+        s3_control_client = mock.Mock()
+        requester_credentials = credentials.Credentials(access_key="access_key", secret_key="secret_key", token="token")
+        cache_key = CacheKey(requester_credentials, 'READ', "s3://bucket/name")
+        access_grants_credentials = {
+            'Credentials': {
+                'AccessKeyId': 'access_key_id',
+                'SecretAccessKey': 'secret_access_key',
+                'SessionToken': 'session_token',
+                'Expiration': datetime(2015, 1, 1)
+            }
+        }
+        get_credentials_mock.return_value = access_grants_credentials
+        plugin = S3AccessGrantsPlugin(s3_client, False, audit_context="my-audit-context")
+        plugin._get_value_from_cache(cache_key, s3_control_client, '123456789012')
+        get_credentials_mock.assert_called_once_with(s3_control_client, cache_key,
+                                                     '123456789012',
+                                                     plugin.access_denied_cache,
+                                                     audit_context="my-audit-context")
+
+    @patch('aws_s3_access_grants_boto3_plugin.s3_access_grants_plugin.AccessGrantsCache.get_credentials')
+    def test_get_value_from_cache_passes_none_audit_context_when_not_set(self, get_credentials_mock):
+        s3_client = self._create_mock_s3_client()
+        s3_control_client = mock.Mock()
+        requester_credentials = credentials.Credentials(access_key="access_key", secret_key="secret_key", token="token")
+        cache_key = CacheKey(requester_credentials, 'READ', "s3://bucket/name")
+        access_grants_credentials = {
+            'Credentials': {
+                'AccessKeyId': 'access_key_id',
+                'SecretAccessKey': 'secret_access_key',
+                'SessionToken': 'session_token',
+                'Expiration': datetime(2015, 1, 1)
+            }
+        }
+        get_credentials_mock.return_value = access_grants_credentials
+        plugin = S3AccessGrantsPlugin(s3_client, False)
+        plugin._get_value_from_cache(cache_key, s3_control_client, '123456789012')
+        get_credentials_mock.assert_called_once_with(s3_control_client, cache_key,
+                                                     '123456789012',
+                                                     plugin.access_denied_cache,
+                                                     audit_context=None)

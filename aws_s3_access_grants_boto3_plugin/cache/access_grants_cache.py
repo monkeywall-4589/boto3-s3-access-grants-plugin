@@ -57,7 +57,7 @@ class AccessGrantsCache:
             prefix = prefix[:-1]
         return None
 
-    def _get_credentials_from_service(self, s3_control_client, cache_key, account_id):
+    def _get_credentials_from_service(self, s3_control_client, cache_key, account_id, audit_context=None):
         if s3_control_client is None:
             raise IllegalArgumentException("S3 Control Client should not be null")
         bucket_owner_account_id = self.account_id_resolver_cache.resolve(s3_control_client, account_id,
@@ -65,8 +65,15 @@ class AccessGrantsCache:
         logging.debug((
                 "Fetching credentials from Access Grants for accountId: " + bucket_owner_account_id + ", s3Prefix: " + cache_key.s3_prefix +
                 ", permission: " + cache_key.permission + ", privilege: " + "DEFAULT"))
-        return s3_control_client.get_data_access(AccountId=bucket_owner_account_id, Target=cache_key.s3_prefix,
-                                                 Permission=cache_key.permission, Privilege='Default')
+        get_data_access_params = {
+            'AccountId': bucket_owner_account_id,
+            'Target': cache_key.s3_prefix,
+            'Permission': cache_key.permission,
+            'Privilege': 'Default',
+        }
+        if audit_context is not None:
+            get_data_access_params['AuditContext'] = audit_context
+        return s3_control_client.get_data_access(**get_data_access_params)
 
     # This method removes '/*' from matchedGrantTarget if present.
     # This helps us differentiate between grants of type "s3://bucket/prefix/*" and "s3://bucket/prefix*".
@@ -75,7 +82,7 @@ class AccessGrantsCache:
             return matched_grant_target[:-2]
         return matched_grant_target
 
-    def get_credentials(self, s3_control_client, cache_key, account_id, access_denied_cache):
+    def get_credentials(self, s3_control_client, cache_key, account_id, access_denied_cache, audit_context=None):
         logging.debug("Fetching credentials from Access Grants for s3Prefix: " + cache_key.s3_prefix)
         credentials = self._search_credentials_at_prefix_level(cache_key)
         if credentials is None and (cache_key.permission == "READ" or cache_key.permission == "WRITE"):
@@ -89,7 +96,7 @@ class AccessGrantsCache:
         if credentials is None:
             logging.debug("Credentials not available in the cache. Fetching credentials from Access Grants service.")
             try:
-                response = self._get_credentials_from_service(s3_control_client, cache_key, account_id)
+                response = self._get_credentials_from_service(s3_control_client, cache_key, account_id, audit_context=audit_context)
                 credentials = response["Credentials"]
                 matched_grant_target = response["MatchedGrantTarget"]
                 if matched_grant_target.endswith("*"):  # we do not cache object level grants

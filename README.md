@@ -22,7 +22,7 @@ from aws_s3_access_grants_boto3_plugin.s3_access_grants_plugin import S3AccessGr
 
 session = botocore.session.get_session()
 s3_client = session.create_client('s3')
-plugin = S3AccessGrantsPlugin(s3_client, fallback_enabled=True, customer_session=session)
+plugin = S3AccessGrantsPlugin(s3_client, fallback_enabled=True, customer_session=session, audit_context="my-query-id-12345")
 plugin.register()
 ```
 
@@ -33,6 +33,8 @@ fallback_enabled takes in a boolean value. This option decides if we will fall b
 Note that fallback_enabled can be passed while creating the plugin (as showed in example above). If fallback_enabled is not set, we will default to False.
 
 customer_session is an optional parameter of type botocore.session.Session. This session will be used to create the internal sts, s3, and s3control clients. If no session is passed the default botocore session will be used to create these clients.
+
+audit_context is an optional string parameter that provides additional context for CloudTrail audit logging. When provided, it is included in the `GetDataAccess` API call as the `AuditContext` parameter. This value is purely for auditing purposes and does not affect grant evaluation or credential caching. If not set, it defaults to None and is omitted from the API call.
 
 ### Notes
 * The plugin supports delete_objects API and copy_object API which S3 Access Grants does not implicitly support. For these APIs we get the common prefix of all the object keys and find their common ancestor. If you  have a grant present on the common ancestor, you will get Access Grants credentials based on that grant.

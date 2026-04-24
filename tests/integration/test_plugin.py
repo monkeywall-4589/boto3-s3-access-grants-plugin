@@ -89,6 +89,13 @@ class TestPlugin(unittest.TestCase):
                                                 Key=self.test_setup.TEST_LOCATION_2 + 'copiedFile.txt')
         self.assertEqual(response['ResponseMetadata']['HTTPStatusCode'], 204)
 
+    def test_grant_present_with_audit_context(self):
+        self.s3_client = self.session.create_client('s3')
+        self.plugin = S3AccessGrantsPlugin(self.s3_client, False, audit_context="integration-test-context")
+        self.plugin.register()
+        response = self.s3_client.get_object(Bucket=self.test_setup.registered_bucket_name, Key=self.test_setup.TEST_OBJECT_1)
+        self.assertEqual(response['ResponseMetadata']['HTTPStatusCode'], 200)
+
     def test_delete_objects_grant_present(self):
         self.createS3Client(enable_fallback=False)
         self.s3_client.put_object(Bucket=self.test_setup.registered_bucket_name,

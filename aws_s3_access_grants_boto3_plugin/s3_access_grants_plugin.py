@@ -21,9 +21,10 @@ class S3AccessGrantsPlugin:
     client_dict = {}
     session_config = botocore.config.Config(user_agent="aws_s3_access_grants_boto3_plugin")
 
-    def __init__(self, s3_client, fallback_enabled=False, customer_session=None):
+    def __init__(self, s3_client, fallback_enabled=False, customer_session=None, audit_context=None):
         self.s3_client = s3_client
         self.fallback_enabled = fallback_enabled
+        self.audit_context = audit_context
 
         if isinstance(customer_session, botocore.session.Session):
             self.session = customer_session
@@ -149,7 +150,8 @@ class S3AccessGrantsPlugin:
             raise access_denied_exception
         return self.access_grants_cache.get_credentials(s3_control_client, cache_key,
                                                         requester_account_id,
-                                                        self.access_denied_cache)
+                                                        self.access_denied_cache,
+                                                        audit_context=self.audit_context)
 
 
 def initialize_client_plugin(client):

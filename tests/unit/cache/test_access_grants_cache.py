@@ -204,3 +204,68 @@ class TestAccessGrantsCache(unittest.TestCase):
         time.sleep(2)
         self.assertEqual(access_grants_cache._get_value_from_cache(key), None)
 
+    def test_get_credentials_from_service_with_audit_context(self):
+        self.mock_s3_control_client.get_data_access.return_value = {
+            'Credentials': {
+                'AccessKeyId': 'access_key_id',
+                'SecretAccessKey': 'secret_access_key',
+                'SessionToken': 'session_token',
+                'Expiration': datetime(2015, 1, 1)
+            },
+            'MatchedGrantTarget': 'string'
+        }
+        self.mock_s3_control_client.get_access_grants_instance_for_prefix.return_value = {
+            'AccessGrantsInstanceArn': 'arn:aws:s3:us-east-2:987654321098:access-grants/default',
+            'AccessGrantsInstanceId': 'abcdefghijklmnopqrstuvwxyz'
+        }
+        requester_credentials = credentials.Credentials(access_key="access_key", secret_key="secret_key", token="token")
+        key = CacheKey(requester_credentials, 'READ', "s3://bucket-name/prefixA")
+        self.access_grants_cache.get_credentials(self.mock_s3_control_client, key,
+                                                 self.requester_account_id, self.access_denied_cache,
+                                                 audit_context="test-audit-context")
+        call_kwargs = self.mock_s3_control_client.get_data_access.call_args
+        self.assertEqual(call_kwargs[1]['AuditContext'], 'test-audit-context')
+
+    def test_get_credentials_from_service_without_audit_context(self):
+        self.mock_s3_control_client.get_data_access.return_value = {
+            'Credentials': {
+                'AccessKeyId': 'access_key_id',
+                'SecretAccessKey': 'secret_access_key',
+                'SessionToken': 'session_token',
+                'Expiration': datetime(2015, 1, 1)
+            },
+            'MatchedGrantTarget': 'string'
+        }
+        self.mock_s3_control_client.get_access_grants_instance_for_prefix.return_value = {
+            'AccessGrantsInstanceArn': 'arn:aws:s3:us-east-2:987654321098:access-grants/default',
+            'AccessGrantsInstanceId': 'abcdefghijklmnopqrstuvwxyz'
+        }
+        requester_credentials = credentials.Credentials(access_key="access_key", secret_key="secret_key", token="token")
+        key = CacheKey(requester_credentials, 'READ', "s3://bucket-name/prefixA")
+        self.access_grants_cache.get_credentials(self.mock_s3_control_client, key,
+                                                 self.requester_account_id, self.access_denied_cache)
+        call_kwargs = self.mock_s3_control_client.get_data_access.call_args
+        self.assertNotIn('AuditContext', call_kwargs[1])
+
+    def test_get_credentials_from_service_with_none_audit_context(self):
+        self.mock_s3_control_client.get_data_access.return_value = {
+            'Credentials': {
+                'AccessKeyId': 'access_key_id',
+                'SecretAccessKey': 'secret_access_key',
+                'SessionToken': 'session_token',
+                'Expiration': datetime(2015, 1, 1)
+            },
+            'MatchedGrantTarget': 'string'
+        }
+        self.mock_s3_control_client.get_access_grants_instance_for_prefix.return_value = {
+            'AccessGrantsInstanceArn': 'arn:aws:s3:us-east-2:987654321098:access-grants/default',
+            'AccessGrantsInstanceId': 'abcdefghijklmnopqrstuvwxyz'
+        }
+        requester_credentials = credentials.Credentials(access_key="access_key", secret_key="secret_key", token="token")
+        key = CacheKey(requester_credentials, 'READ', "s3://bucket-name/prefixA")
+        self.access_grants_cache.get_credentials(self.mock_s3_control_client, key,
+                                                 self.requester_account_id, self.access_denied_cache,
+                                                 audit_context=None)
+        call_kwargs = self.mock_s3_control_client.get_data_access.call_args
+        self.assertNotIn('AuditContext', call_kwargs[1])
+
